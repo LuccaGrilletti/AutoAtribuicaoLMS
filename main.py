@@ -97,15 +97,48 @@ async def processar_turma(detalhe: TurmaDetalhePage, batch: ConfigBatchPage,
             await detalhe.clicar_configurar(grupo["indice"])
             await batch.configurar(grupo["tipo"])
             processados.append(grupo["tipo"])
-            log.registrar(turma["nome"], grupo["tipo"], "sucesso")
-            statuses.append("sucesso")
-            print(f"  grupo {grupo['tipo']}: sucesso")
+            log.registrar(turma["nome"], grupo["tipo"], "sucesso_lote")
+            statuses.append("sucesso_lote")
+            print(f"  grupo {grupo['tipo']}: sucesso (lote)")
             await detalhe.ir_aba_cursos()  # o salvar redireciona para /class/{uuid}
         except Exception as e:
             # estado da página é incerto após a falha — abandona a turma
             await _registrar_erro(detalhe.pagina, log, turma["nome"], grupo["tipo"], e)
             statuses.append("erro")
             break
+
+    # segunda passada: cursos que continuam pendentes após o lote são
+    # configurados individualmente via engrenagem (evita retrabalho/loop do lote)
+    tentados_individual: set[str] = set()
+    while True:
+        pendentes_individuais = await detalhe.listar_pendentes_individuais()
+        restantes_individuais = [p for p in pendentes_individuais if p["nome"] not in tentados_individual]
+        if not restantes_individuais:
+            break
+
+        item = restantes_individuais[0]
+        tentados_individual.add(item["nome"])
+        print(f"  resolvendo individualmente: {item['nome']} ({item['tipo']})")
+        try:
+            await detalhe.clicar_engrenagem(item["indice"])
+            await batch.configurar(item["tipo"])
+            await detalhe.ir_aba_cursos()
+
+            ainda_pendente = any(
+                p["nome"] == item["nome"]
+                for p in await detalhe.listar_pendentes_individuais()
+            )
+            if ainda_pendente:
+                log.registrar(turma["nome"], item["tipo"], "pendente_persistente", item["nome"])
+                statuses.append("pendente_persistente")
+                print(f"  {item['nome']}: continua pendente mesmo após config individual")
+            else:
+                log.registrar(turma["nome"], item["tipo"], "sucesso_individual", item["nome"])
+                statuses.append("sucesso_individual")
+                print(f"  {item['nome']}: resolvido individualmente")
+        except Exception as e:
+            await _registrar_erro(detalhe.pagina, log, turma["nome"], item["tipo"], e)
+            statuses.append("erro")
 
     if not statuses:
         log.registrar(turma["nome"], "-", "pulado", "sem grupos para configurar")
@@ -149,7 +182,8 @@ async def main():
         if args.limite_turmas:
             pendentes = pendentes[: args.limite_turmas]
 
-        totais = {"sucesso": 0, "erro": 0, "pulado": 0}
+        totais = {"sucesso_lote": 0, "sucesso_individual": 0,
+                  "pendente_persistente": 0, "erro": 0, "pulado": 0}
         detalhe = TurmaDetalhePage(pagina_campus)
         batch = ConfigBatchPage(pagina_campus)
         for i, turma in enumerate(pendentes, start=1):
@@ -158,7 +192,9 @@ async def main():
             for status in statuses:
                 totais[status] += 1
 
-        print(f"\n=== Resumo: {totais['sucesso']} sucesso(s), "
+        print(f"\n=== Resumo: {totais['sucesso_lote']} sucesso(s) em lote, "
+              f"{totais['sucesso_individual']} sucesso(s) individual(is), "
+              f"{totais['pendente_persistente']} pendente(s) persistente(s), "
               f"{totais['erro']} erro(s), {totais['pulado']} pulado(s) ===")
         print(f"Log CSV: {log.caminho}")
     finally:

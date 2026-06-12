@@ -102,6 +102,10 @@ async def criar_browser(headless=False):
         geolocation={"latitude": -23.5505, "longitude": -46.6333},
         permissions=["geolocation"],
     )
+    # sessão órfã (ex.: Ctrl+C na execução anterior) deixa cookie do identity em
+    # estado que gera loop de redirect OIDC (ERR_TOO_MANY_REDIRECTS) — zera os
+    # cookies mantendo histórico/fingerprint do perfil (score do reCAPTCHA)
+    await contexto.clear_cookies()
     await contexto.add_init_script(_STEALTH_INIT)
     if not headless:
         await contexto.add_init_script(_DEBUG_OVERLAY)

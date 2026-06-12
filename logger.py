@@ -22,7 +22,8 @@ class LoggerCSV:
             csv.writer(arquivo).writerow(self.CAMPOS)
 
     def registrar(self, turma: str, grupo: str, status: str, detalhe: str = ""):
-        """status ∈ {sucesso, erro, pulado}; grupo = ANUAL | BIMESTRAL | '-'."""
+        """status ∈ {sucesso_lote, sucesso_individual, pendente_persistente,
+        erro, pulado}; grupo = ANUAL | BIMESTRAL | '-'."""
         tipo = grupo.lower() if grupo in ("ANUAL", "BIMESTRAL") else ""
         with open(self.caminho, "a", newline="", encoding="utf-8-sig") as arquivo:
             csv.writer(arquivo).writerow([

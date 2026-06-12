@@ -5,8 +5,6 @@ Cada seção de grupo de cursos (ANUAL e/ou BIMESTRAL) tem um botão
 pois o mesmo curso pode ser anual numa turma e bimestral noutra.
 """
 
-import asyncio
-import re
 from urllib.parse import urlsplit
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
@@ -33,7 +31,11 @@ _JS_TIPO_SECAO = """el => {
 
 class TurmaDetalhePage:
     BOTAO_CONFIG_LOTE = "button.config-batch-button"
-    ABA_CURSOS_FALLBACK = 'text="Cursos"'
+    ABA_CURSOS = '.MuiStepLabel-label:text-is("Cursos")'
+    CARD_WRAPPER = "div.class-contents-card__wrapper"
+    ICONE_PENDENTE_CARD = 'div.class-contents-card__error-config_icon[aria-label="Pendente de configuração"]'
+    BOTAO_ENGRENAGEM = "div.MuiCardHeader-action button"
+    TITULO_CARD = ".MuiCardHeader-content"  # título + subtítulo + turma — texto único por card
 
     def __init__(self, pagina: Page):
         self.pagina = pagina
@@ -46,13 +48,8 @@ class TurmaDetalhePage:
                                timeout=config.TIMEOUT_NAVEGACAO)
 
     async def ir_aba_cursos(self):
-        """Abre a aba Cursos (texto igual em PT e ES)."""
-        aba = self.pagina.get_by_role("tab", name=re.compile("cursos", re.I))
-        try:
-            await aba.first.click(timeout=10_000)
-        except Exception:
-            await self.pagina.click(self.ABA_CURSOS_FALLBACK, timeout=config.TIMEOUT_ELEMENTO)
-        await asyncio.sleep(1.5)  # conteúdo da aba renderiza via SPA
+        """Abre a aba Cursos — é um MuiStepLabel (Stepper), não um tab; texto igual em PT/ES."""
+        await self.pagina.click(self.ABA_CURSOS, timeout=config.TIMEOUT_ELEMENTO)
 
     async def listar_grupos(self) -> list[dict]:
         """Retorna [{"tipo", "indice"}] dos botões "Configurar em lote" presentes.
@@ -74,3 +71,26 @@ class TurmaDetalhePage:
         """Clica no botão "Configurar em lote" da seção e espera o formulário abrir."""
         await self.pagina.locator(self.BOTAO_CONFIG_LOTE).nth(indice).click()
         await self.pagina.wait_for_url("**config-batch**", timeout=config.TIMEOUT_NAVEGACAO)
+
+    async def listar_pendentes_individuais(self) -> list[dict]:
+        """Cards de curso na aba Cursos que ainda mostram o ícone de pendência.
+
+        Retorna [{"tipo", "indice", "nome"}]. `tipo` via _JS_TIPO_SECAO (mesma
+        lógica usada para os botões de lote); `nome` identifica o card pra log e
+        pro controle anti-loop da segunda passada.
+        """
+        cards = self.pagina.locator(self.CARD_WRAPPER)
+        pendentes = []
+        for i in range(await cards.count()):
+            card = cards.nth(i)
+            if await card.locator(self.ICONE_PENDENTE_CARD).count() == 0:
+                continue
+            tipo = await card.evaluate(_JS_TIPO_SECAO)
+            nome = (await card.locator(self.TITULO_CARD).inner_text()).strip()
+            pendentes.append({"tipo": (tipo or "DESCONHECIDO").upper(), "indice": i, "nome": nome})
+        return pendentes
+
+    async def clicar_engrenagem(self, indice: int):
+        """Abre a configuração individual do curso (mesmo form do lote, sem wait de URL)."""
+        cards = self.pagina.locator(self.CARD_WRAPPER)
+        await cards.nth(indice).locator(self.BOTAO_ENGRENAGEM).click()

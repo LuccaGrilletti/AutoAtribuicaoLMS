@@ -30,8 +30,7 @@ class ConfigBatchPage:
         self.pagina = pagina
 
     async def configurar(self, tipo: str):
-        """Preenche e salva o formulário do grupo (ANUAL ou BIMESTRAL)."""
-        await self.pagina.wait_for_url("**config-batch**", timeout=config.TIMEOUT_NAVEGACAO)
+        """Preenche e salva o formulário (lote ou individual — mesma estrutura)."""
         await self._preencher_escala()
         if tipo == "ANUAL":
             await self._preencher_anual()
@@ -123,15 +122,14 @@ class ConfigBatchPage:
             if asyncio.get_event_loop().time() > prazo:
                 raise PlaywrightTimeout("Botão Salvar continuou desabilitado — formulário incompleto?")
             await asyncio.sleep(0.2)
+        url_form = self.pagina.url
         await botao.click()
 
-        # sucesso = toast + redirect para /class/{uuid}; o toast pode sumir
-        # antes da checagem, então o redirect é a confirmação obrigatória
+        # sucesso = toast + redirect; o toast pode sumir antes da checagem,
+        # então a saída da URL do form (vale pro lote /config-batch e pro
+        # individual /class/{turma}/config/{curso}) é a confirmação obrigatória
         try:
             await self.pagina.wait_for_selector(self.TOAST_SUCESSO, timeout=10_000)
         except PlaywrightTimeout:
             pass
-        await self.pagina.wait_for_url(
-            lambda url: "/class/" in url and "config-batch" not in url,
-            timeout=20_000,
-        )
+        await self.pagina.wait_for_url(lambda url: url != url_form, timeout=20_000)
