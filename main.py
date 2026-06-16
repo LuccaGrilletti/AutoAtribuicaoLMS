@@ -1,8 +1,9 @@
 """Orquestração da atribuição de conteúdos por turma.
 
 Fluxo completo: login → coleta de turmas pendentes → para cada turma,
-configura em lote os grupos ANUAL/BIMESTRAL, com log CSV em logs/,
-screenshot de falha em errors/ e resumo final no console.
+configura em lote os grupos ANUAL/BIMESTRAL, persistindo o resultado no
+PostgreSQL (execucoes + resultados), com screenshot de falha em errors/ e
+resumo final no console.
 
 Use --limite-turmas/--limite-grupos para execuções controladas de validação.
 """
@@ -65,7 +66,7 @@ async def processar_turma(detalhe: TurmaDetalhePage, batch: ConfigBatchPage,
                           log: Repositorio) -> list[str]:
     """Configura os grupos pendentes de uma turma; retorna os status gerados.
 
-    Qualquer erro é registrado (CSV + screenshot) e a turma é abandonada —
+    Qualquer erro é registrado (banco + screenshot) e a turma é abandonada —
     a execução continua na próxima.
     """
     statuses: list[str] = []

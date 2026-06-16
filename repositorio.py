@@ -2,11 +2,13 @@
 
 Padrão idêntico ao ModernaCOREAutoCheck: tabela `execucoes` (uma linha
 por run do script) + tabela `resultados` (uma linha por grupo/curso
-processado), relacionadas por execucao_id.
+processado), relacionadas por execucao_id. Substituiu a persistência
+anterior em CSV (`logger.py`), mantendo a assinatura de `registrar()`.
 
-Interface de `registrar()` idêntica ao LoggerCSV anterior — a troca em
-main.py é cirúrgica. Cada insert em `resultados` é commitado
-imediatamente, então o log sobrevive a interrupções no meio do processo.
+Cada insert em `resultados` é commitado imediatamente, então o registro
+sobrevive a interrupções no meio do processo (ex.: Ctrl+C). A linha de
+`execucoes` é aberta no __init__ e fechada com os totais em
+`fechar_execucao()`, chamado no finally de main().
 """
 
 import psycopg2
@@ -44,7 +46,6 @@ class Repositorio:
     def registrar(self, turma: str, grupo: str, status: str, detalhe: str = ""):
         """Insere um resultado individual. Commit imediato — sobrevive a Ctrl+C.
 
-        Mesma assinatura do LoggerCSV.registrar() — troca transparente.
         status ∈ {sucesso_lote, sucesso_individual, pendente_persistente, erro, pulado}
         grupo  ∈ {ANUAL, BIMESTRAL, -}
         """

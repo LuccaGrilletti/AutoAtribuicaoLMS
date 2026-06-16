@@ -25,7 +25,6 @@ DB_PASS = os.getenv("DB_PASS", "12345")
 TIMEOUT_ELEMENTO = 30_000
 TIMEOUT_NAVEGACAO = 60_000
 
-# Diretórios de runtime
+# Diretórios de runtime (resultados vão para o PostgreSQL, não para disco)
 DIR_PERFIL_NAVEGADOR = BASE_DIR / "browser_profile"
-DIR_LOGS = BASE_DIR / "logs"
 DIR_ERROS = BASE_DIR / "errors"
