@@ -17,7 +17,7 @@ from playwright.async_api import Page
 
 import config
 from browser import criar_browser, fechar_browser
-from logger import LoggerCSV
+from repositorio import Repositorio
 from pages.config_batch_page import ConfigBatchPage
 from pages.lista_turmas_page import ListaTurmasPage
 from pages.login_page import LoginPage
@@ -50,7 +50,7 @@ async def salvar_screenshot(pagina: Page, turma_nome: str, grupo: str) -> str | 
         return None  # screenshot é melhor-esforço; não pode mascarar o erro original
 
 
-async def _registrar_erro(pagina: Page, log: LoggerCSV, turma_nome: str,
+async def _registrar_erro(pagina: Page, log: Repositorio, turma_nome: str,
                           grupo: str, excecao: Exception):
     detalhe = _resumir_erro(excecao)
     caminho = await salvar_screenshot(pagina, turma_nome, grupo)
@@ -62,7 +62,7 @@ async def _registrar_erro(pagina: Page, log: LoggerCSV, turma_nome: str,
 
 async def processar_turma(detalhe: TurmaDetalhePage, batch: ConfigBatchPage,
                           turma: dict, limite_grupos: int | None,
-                          log: LoggerCSV) -> list[str]:
+                          log: Repositorio) -> list[str]:
     """Configura os grupos pendentes de uma turma; retorna os status gerados.
 
     Qualquer erro é registrado (CSV + screenshot) e a turma é abandonada —
@@ -154,8 +154,8 @@ async def main():
         print("ERRO: preencha LMS_USER e LMS_PASS no arquivo .env antes de executar.")
         sys.exit(1)
 
-    log = LoggerCSV()
-    print(f"Log CSV desta execução: {log.caminho}")
+    repo = Repositorio()
+    print(f"Execução registrada no banco (id={repo.execucao_id})")
 
     print("Abrindo navegador...")
     playwright, contexto, pagina = await criar_browser(headless=config.HEADLESS)
@@ -188,7 +188,7 @@ async def main():
         batch = ConfigBatchPage(pagina_campus)
         for i, turma in enumerate(pendentes, start=1):
             print(f"\n[{i}/{len(pendentes)}] Turma: {turma['nome']}")
-            statuses = await processar_turma(detalhe, batch, turma, args.limite_grupos, log)
+            statuses = await processar_turma(detalhe, batch, turma, args.limite_grupos, repo)
             for status in statuses:
                 totais[status] += 1
 
@@ -196,8 +196,11 @@ async def main():
               f"{totais['sucesso_individual']} sucesso(s) individual(is), "
               f"{totais['pendente_persistente']} pendente(s) persistente(s), "
               f"{totais['erro']} erro(s), {totais['pulado']} pulado(s) ===")
-        print(f"Log CSV: {log.caminho}")
     finally:
+        if 'repo' in locals():
+            repo.fechar_execucao(totais if 'totais' in locals() else {},
+                                 status="concluido")
+            repo.fechar_conexao()
         await fechar_browser(playwright, contexto)
 
 
