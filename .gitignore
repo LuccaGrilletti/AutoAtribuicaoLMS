@@ -6,3 +6,4 @@ errors/
 __pycache__/
 *.pyc
 .vscode/
+.pytest_cache/
