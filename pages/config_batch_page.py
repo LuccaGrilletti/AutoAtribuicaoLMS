@@ -51,9 +51,9 @@ class ConfigBatchPage:
         # o campo carrega async com placeholder "..." — esperar o render
         controle = container.locator(self.CONTROL).first
         await controle.wait_for(state="visible", timeout=config.TIMEOUT_ELEMENTO)
-        prazo = asyncio.get_event_loop().time() + config.TIMEOUT_ELEMENTO / 1000
+        prazo = asyncio.get_running_loop().time() + config.TIMEOUT_ELEMENTO / 1000 #asyncio.get_event_loop().time()
         while (await controle.inner_text()).strip() == "...":
-            if asyncio.get_event_loop().time() > prazo:
+            if asyncio.get_running_loop().time() > prazo: #asyncio.get_event_loop().time()
                 raise PlaywrightTimeout("Campo Escala não terminou de carregar (placeholder '...')")
             await asyncio.sleep(0.2)
 
@@ -117,9 +117,9 @@ class ConfigBatchPage:
         botao = self.pagina.locator(self.BOTAO_SALVAR).first
         await botao.wait_for(state="visible", timeout=config.TIMEOUT_ELEMENTO)
         # o botão só habilita com o form completo
-        prazo = asyncio.get_event_loop().time() + config.TIMEOUT_ELEMENTO / 1000
+        prazo = asyncio.get_running_loop().time() + config.TIMEOUT_ELEMENTO / 1000 #asyncio.get_event_loop().time()
         while await botao.is_disabled():
-            if asyncio.get_event_loop().time() > prazo:
+            if asyncio.get_running_loop().time() > prazo: #asyncio.get_event_loop().time()
                 raise PlaywrightTimeout("Botão Salvar continuou desabilitado — formulário incompleto?")
             await asyncio.sleep(0.2)
         url_form = self.pagina.url
